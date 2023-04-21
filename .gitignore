@@ -1,0 +1,4 @@
+WindowsFormsApp1/bin/
+WindowsFormsApp1/obj/
+.vs/GenerateChangedFiles/*
+!.vs/GenerateChangedFiles/config/
