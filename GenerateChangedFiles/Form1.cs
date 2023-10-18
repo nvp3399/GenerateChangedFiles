@@ -16,6 +16,8 @@ namespace GenerateChangedFiles
 {
     public partial class Form1 : Form
     {
+        private DefaultConfig _defaultConfig;
+
         public Form1()
         {
             InitializeComponent();
@@ -31,13 +33,13 @@ namespace GenerateChangedFiles
                     .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
                     .AddJsonFile("appsettings.json").Build();
                 var section = config.GetSection(nameof(DefaultConfig));
-                var defaultConfig = section.Get<DefaultConfig>();
+                _defaultConfig = section.Get<DefaultConfig>();
 
                 // Set values of text boxes on the form
-                sourceFolderTxt.Text = defaultConfig.SourceFolder;
-                destFolderTxt.Text = defaultConfig.DestinationFolder;
-                sourceBranchTxt.Text = string.IsNullOrWhiteSpace(defaultConfig.SourceBranch) ? "master" : defaultConfig.SourceBranch;
-                ChoosenBranchTxt.Text = string.IsNullOrWhiteSpace(defaultConfig.ChoosenBranch) ? GetCurrentBranch(defaultConfig.SourceFolder) : defaultConfig.ChoosenBranch;
+                sourceFolderTxt.Text = _defaultConfig.SourceFolder;
+                destFolderTxt.Text = _defaultConfig.DestinationFolder;
+                sourceBranchTxt.Text = string.IsNullOrWhiteSpace(_defaultConfig.SourceBranch) ? "master" : _defaultConfig.SourceBranch;
+                ChoosenBranchTxt.Text = string.IsNullOrWhiteSpace(_defaultConfig.ChoosenBranch) ? GetCurrentBranch(_defaultConfig.SourceFolder) : _defaultConfig.ChoosenBranch;
             }
             catch (Exception ex)
             {
@@ -109,6 +111,12 @@ namespace GenerateChangedFiles
 
                 // Run another command to get a list of changed files
                 var cmd = $@"/c git diff --name-only {choosenBranch}..{sourceBranch}";
+
+                if (!string.IsNullOrWhiteSpace(_defaultConfig.DefaultSqlFolder))
+                {
+                    cmd += $" -- {_defaultConfig.DefaultSqlFolder}";
+                }
+
                 process.StartInfo.Arguments = cmd;
                 process.Start();
                 var cmdOutput = process.StandardOutput.ReadToEnd();
@@ -150,11 +158,30 @@ namespace GenerateChangedFiles
                     }
                 }
 
-                // After copying all changed files, merge all files in each subdirectory of the destination folder into a single file with a .sql extension
-                foreach (var directory in Directory.GetDirectories(destFolder))
+                MergeFiles(destFolder);
+
+                // Display a message indicating that the operation has completed
+                WriteLog("The operation has been completed! Please refer to the log for more information.");
+                MessageBox.Show("The operation has been completed! Please refer to the log for more information.");
+            }
+            catch (Exception ex)
+            {
+                WriteLog(ex.ToString());
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private void MergeFiles(string folderPath)
+        {
+            // After copying all changed files, merge all files in each subdirectory of the destination folder into a single file with a .sql extension
+            foreach (var directory in Directory.GetDirectories(folderPath))
+            {
+                var files = Directory.GetFiles(directory);
+
+                if (files.Any())
                 {
                     var mergedContent = new StringBuilder();
-                    foreach (var file in Directory.GetFiles(directory))
+                    foreach (var file in files)
                     {
                         // Read file content and remove zwnbsp character
                         var fileContent = File.ReadAllText(file);
@@ -165,19 +192,12 @@ namespace GenerateChangedFiles
                         mergedContent.AppendLine();
                     }
                     var mergedFileName = Path.GetFileName(directory) + ".sql";
-                    var mergedFilePath = Path.Combine(destFolder, mergedFileName);
+                    var mergedFilePath = Path.Combine(folderPath, mergedFileName);
                     File.WriteAllText(mergedFilePath, mergedContent.ToString(), Encoding.Unicode);
                     WriteLog($"The merged file {mergedFileName} has been created.");
                 }
-
-                // Display a message indicating that the operation has completed
-                WriteLog("The operation has been completed! Please refer to the log for more information.");
-                MessageBox.Show("The operation has been completed! Please refer to the log for more information.");
-            }
-            catch (Exception ex)
-            {
-                WriteLog(ex.ToString());
-                MessageBox.Show(ex.Message);
+               
+                MergeFiles(directory);
             }
         }
         private void WriteLog(string content)

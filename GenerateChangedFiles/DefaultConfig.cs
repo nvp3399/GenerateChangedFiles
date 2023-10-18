@@ -12,5 +12,6 @@ namespace GenerateChangedFiles
         public string DestinationFolder { get; set; }
         public string SourceBranch { get; set; }
         public string ChoosenBranch { get; set; }
+        public string DefaultSqlFolder { get; set; }
     }
 }
